@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SessionHandler.Data;
+using SessionHandler.Exceptions;
 using SessionHandler.Interfaces;
 using SessionHandler.Repositories;
 using SessionHandler.Services;
@@ -12,6 +13,10 @@ builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
+// Translate session domain exceptions into RFC 7807 responses.
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<SessionExceptionHandler>();
+
 // Session persistence (EF Core + SQLite).
 builder.Services.AddDbContext<SessionDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("SessionDb")));
@@ -21,6 +26,8 @@ builder.Services.AddScoped<ISessionService, SessionService>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
+app.UseExceptionHandler();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();

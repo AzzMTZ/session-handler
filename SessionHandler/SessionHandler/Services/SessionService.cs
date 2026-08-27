@@ -12,7 +12,7 @@ public class SessionService(ISessionRepository repository) : ISessionService
     public async Task<Session> Login(LoginEvent loginEvent, CancellationToken cancellationToken = default)
     {
         var timestamp = AsUtc(loginEvent.Timestamp);
-        var active = await repository.GetActiveByCompoudId(
+        var active = await repository.GetActiveByCompoundId(
             loginEvent.TenantId, loginEvent.Username, loginEvent.Ip, cancellationToken);
 
         if (active is not null)
@@ -37,7 +37,7 @@ public class SessionService(ISessionRepository repository) : ISessionService
 
     public async Task<Session> Update(UpdateEvent updateEvent, CancellationToken cancellationToken = default)
     {
-        var active = await repository.GetActiveByCompoudId(
+        var active = await repository.GetActiveByCompoundId(
             updateEvent.TenantId, updateEvent.Username, updateEvent.Ip, cancellationToken);
 
         if (active is null)
@@ -55,7 +55,7 @@ public class SessionService(ISessionRepository repository) : ISessionService
     public async Task Logout(LogoutEvent logoutEvent, CancellationToken cancellationToken = default)
     {
         var timestamp = AsUtc(logoutEvent.Timestamp);
-        var active = await repository.GetActiveByCompoudId(
+        var active = await repository.GetActiveByCompoundId(
             logoutEvent.TenantId, logoutEvent.Username, logoutEvent.Ip, cancellationToken);
 
         if (active is null)
