@@ -1,85 +1,77 @@
 using Microsoft.EntityFrameworkCore;
+using SessionHandler.Dtos;
+using SessionHandler.Exceptions;
 using SessionHandler.Interfaces;
 using SessionHandler.Models;
 
 namespace SessionHandler.Services;
 
 /// <inheritdoc cref="ISessionService" />
-public class SessionService : ISessionService
+public class SessionService(ISessionRepository repository) : ISessionService
 {
-    private readonly ISessionRepository _repository;
-
-    public SessionService(ISessionRepository repository) => _repository = repository;
-
-    public async Task<Session> Login(LoginEvent @event, CancellationToken cancellationToken = default)
+    public async Task<Session> Login(LoginEvent loginEvent, CancellationToken cancellationToken = default)
     {
-        var timestamp = AsUtc(@event.Timestamp);
-        var active = await _repository.GetActiveAsync(
-            @event.TenantId, @event.Username, @event.Ip, cancellationToken);
+        var timestamp = AsUtc(loginEvent.Timestamp);
+        var active = await repository.GetActiveByCompoudId(
+            loginEvent.TenantId, loginEvent.Username, loginEvent.Ip, cancellationToken);
 
-        if (active is null)
+        if (active is not null)
         {
-            active = await _repository.Add(new Session
-            {
-                TenantId = @event.TenantId,
-                Username = @event.Username,
-                Ip = @event.Ip,
-                Tags = @event.Tags.ToList(),
-                LoginAt = timestamp,
-                LastSeenAt = timestamp,
-            }, cancellationToken);
-        }
-        else
-        {
-            // Re-login for an already-open triple: refresh attributes, don't duplicate.
-            ApplyAttributes(active, @event.Tags, timestamp);
+            throw new SessionAlreadyExistsException(loginEvent.TenantId, loginEvent.Username, loginEvent.Ip);
         }
 
-        await _repository.SaveChanges(cancellationToken);
+        active = await repository.Add(new Session
+        {
+            TenantId = loginEvent.TenantId,
+            Username = loginEvent.Username,
+            Ip = loginEvent.Ip,
+            Tags = loginEvent.Tags.ToList(),
+            LoginAt = timestamp,
+            LastSeenAt = timestamp,
+        }, cancellationToken);
+
+
+        await repository.SaveChanges(cancellationToken);
         return active;
     }
 
-    public async Task<Session> Update(UpdateEvent @event, CancellationToken cancellationToken = default)
+    public async Task<Session> Update(UpdateEvent updateEvent, CancellationToken cancellationToken = default)
     {
-        var active = await _repository.GetActiveAsync(
-            @event.TenantId, @event.Username, @event.Ip, cancellationToken);
+        var active = await repository.GetActiveByCompoudId(
+            updateEvent.TenantId, updateEvent.Username, updateEvent.Ip, cancellationToken);
 
         if (active is null)
         {
-            throw new FileNotFoundException();
+            throw new SessionNotFoundException(updateEvent.TenantId, updateEvent.Username, updateEvent.Ip);
         }
 
-        ApplyAttributes(active, @event.Tags, AsUtc(@event.Timestamp));
-        await _repository.SaveChanges(cancellationToken);
+        active.Tags = updateEvent.Tags.ToList();
+        UpdateLastSeenAt(active, AsUtc(updateEvent.Timestamp));
+        await repository.SaveChanges(cancellationToken);
 
         return active;
     }
 
-    public async Task<Session> Logout(LogoutEvent @event, CancellationToken cancellationToken = default)
+    public async Task Logout(LogoutEvent logoutEvent, CancellationToken cancellationToken = default)
     {
-        var timestamp = AsUtc(@event.Timestamp);
-        var active = await _repository.GetActiveAsync(
-            @event.TenantId, @event.Username, @event.Ip, cancellationToken);
+        var timestamp = AsUtc(logoutEvent.Timestamp);
+        var active = await repository.GetActiveByCompoudId(
+            logoutEvent.TenantId, logoutEvent.Username, logoutEvent.Ip, cancellationToken);
 
         if (active is null)
         {
-            throw new FileNotFoundException();
+            throw new SessionNotFoundException(logoutEvent.TenantId, logoutEvent.Username, logoutEvent.Ip);
         }
 
         active.LogoutAt = timestamp;
-        if (timestamp > active.LastSeenAt)
-        {
-            active.LastSeenAt = timestamp;
-        }
-
-        await _repository.SaveChanges(cancellationToken);
-        return active;
+        UpdateLastSeenAt(active, timestamp);
+        await repository.SaveChanges(cancellationToken);
     }
 
-    public async Task<List<Session>> Query(
+    public async Task<List<Session>> Search(
         SessionQuery query, CancellationToken cancellationToken = default)
     {
-        var sessions = _repository.Query();
+        var sessions = repository.Query();
 
         if (!string.IsNullOrEmpty(query.TenantId))
         {
@@ -96,9 +88,13 @@ public class SessionService : ISessionService
             sessions = sessions.Where(s => s.Ip == query.Ip);
         }
 
-        if (!string.IsNullOrEmpty(query.Tag))
+        if (query.Tags is not null && query.Tags.Count > 0)
         {
-            sessions = sessions.Where(s => s.Tags.Contains(query.Tag));
+            sessions = query.Tags.Where(queryTag => !string.IsNullOrEmpty(queryTag))
+                .Aggregate(sessions,
+                    (current, queryTag) =>
+                        current.Where(session => session.Tags.Contains(queryTag))
+                );
         }
 
         if (query.ActiveOnly == true)
@@ -106,17 +102,40 @@ public class SessionService : ISessionService
             sessions = sessions.Where(s => s.LogoutAt == null);
         }
 
-        if (query.ActiveAt is { } activeAtInput)
+        if (query.LoginAt is { Since: { } loginSince })
         {
-            var activeAt = AsUtc(activeAtInput);
-            sessions = sessions.Where(s =>
-                s.LoginAt <= activeAt && (s.LogoutAt == null || s.LogoutAt > activeAt));
+            var since = AsUtc(loginSince);
+            sessions = sessions.Where(s => s.LoginAt >= since);
         }
 
-        if (query.LoggedInAtOrAfter is { } fromInput)
+        if (query.LoginAt is { Until: { } loginUntil })
         {
-            var from = AsUtc(fromInput);
-            sessions = sessions.Where(s => s.LoginAt >= from);
+            var until = AsUtc(loginUntil);
+            sessions = sessions.Where(s => s.LoginAt <= until);
+        }
+
+        if (query.LogoutAt is { Since: { } logoutSince })
+        {
+            var since = AsUtc(logoutSince);
+            sessions = sessions.Where(s => s.LogoutAt != null && s.LogoutAt >= since);
+        }
+
+        if (query.LogoutAt is { Until: { } logoutUntil })
+        {
+            var until = AsUtc(logoutUntil);
+            sessions = sessions.Where(s => s.LogoutAt != null && s.LogoutAt <= until);
+        }
+
+        if (query.LastSeenAt is { Since: { } updateSince })
+        {
+            var since = AsUtc(updateSince);
+            sessions = sessions.Where(s => s.LastSeenAt >= since);
+        }
+
+        if (query.LastSeenAt is { Until: { } updateUntil })
+        {
+            var until = AsUtc(updateUntil);
+            sessions = sessions.Where(s => s.LastSeenAt <= until);
         }
 
         var results = await sessions
@@ -127,12 +146,11 @@ public class SessionService : ISessionService
     }
 
     /// <summary>
-    /// Overwrites the mutable attributes of a session. The last-seen timestamp only ever
-    /// moves forward, so an out-of-order event cannot rewind it.
+    /// Advances the session's last-seen timestamp. The value only ever moves forward,
+    /// so an out-of-order event cannot rewind it.
     /// </summary>
-    private static void ApplyAttributes(Session session, IReadOnlyList<string> tags, DateTime timestamp)
+    private static void UpdateLastSeenAt(Session session, DateTime timestamp)
     {
-        session.Tags = [.. tags];
         if (timestamp > session.LastSeenAt)
         {
             session.LastSeenAt = timestamp;

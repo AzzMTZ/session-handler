@@ -14,10 +14,7 @@ public class SessionRepository(SessionDbContext db) : ISessionRepository
         return result.Entity;
     }
 
-    public Task<Session?> GetById(int id, CancellationToken cancellationToken = default) =>
-        db.Sessions.FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
-
-    public Task<Session?> GetActiveAsync(
+    public Task<Session?> GetActiveByCompoudId(
         string tenantId,
         string username,
         string ip,

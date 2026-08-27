@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using SessionHandler.Dtos;
 using SessionHandler.Interfaces;
 using SessionHandler.Models;
 
@@ -15,41 +16,37 @@ namespace SessionHandler.Controllers;
 /// </summary>
 [ApiController]
 [Route("sessions")]
-public class SessionsController : ControllerBase
+public class SessionsController(ISessionService sessionsService) : ControllerBase
 {
-    private readonly ISessionService _sessions;
-
-    public SessionsController(ISessionService sessions) => _sessions = sessions;
-
     [HttpPost]
     public async Task<ActionResult<Session>> Login([FromBody] LoginEvent loginEvent,
         CancellationToken cancellationToken)
     {
-        var createdSession = await _sessions.Login(loginEvent, cancellationToken);
+        var createdSession = await sessionsService.Login(loginEvent, cancellationToken);
         return CreatedAtAction(nameof(Login), createdSession);
     }
 
     [HttpPut]
-    public async Task<ActionResult<Session>> Update([FromBody] UpdateEvent @event, CancellationToken cancellationToken)
+    public async Task<ActionResult<Session>> Update([FromBody] UpdateEvent updateEvent, CancellationToken cancellationToken)
     {
-        var updatedSession = await _sessions.Update(@event, cancellationToken);
+        var updatedSession = await sessionsService.Update(updateEvent, cancellationToken);
         return Ok(updatedSession);
     }
 
     [HttpDelete]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Logout([FromBody] LogoutEvent @event, CancellationToken cancellationToken)
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> Logout([FromBody] LogoutEvent logoutEvent, CancellationToken cancellationToken)
     {
-        await _sessions.Logout(@event, cancellationToken);
+        await sessionsService.Logout(logoutEvent, cancellationToken);
         return NoContent();
     }
 
     [HttpPost("search")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult<Session>> Search(
+    public async Task<ActionResult<List<Session>>> Search(
         [FromBody] SessionQuery query, CancellationToken cancellationToken)
     {
-        var results = await _sessions.Query(query, cancellationToken);
+        var results = await sessionsService.Search(query, cancellationToken);
         return Ok(results);
     }
 }

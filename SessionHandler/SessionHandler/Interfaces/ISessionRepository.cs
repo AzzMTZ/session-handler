@@ -13,15 +13,12 @@ public interface ISessionRepository
     /// <summary>Stages a new session for insertion.</summary>
     Task<Session> Add(Session session, CancellationToken cancellationToken = default);
 
-    /// <summary>Loads a tracked session by its surrogate key, or <c>null</c> if none exists.</summary>
-    Task<Session?> GetById(int id, CancellationToken cancellationToken = default);
-
     /// <summary>
     /// Loads the tracked active session (<c>LogoutAt is null</c>) for the given identity
     /// and IP, or <c>null</c> if none is open. Returns the most recently opened one if
     /// duplicates exist.
     /// </summary>
-    Task<Session?> GetActiveAsync(
+    Task<Session?> GetActiveByCompoudId(
         string tenantId,
         string username,
         string ip,
