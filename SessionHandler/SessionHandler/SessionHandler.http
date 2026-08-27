@@ -1,6 +1,7 @@
 @SessionHandler_HostAddress = http://localhost:5284
 
-GET {{SessionHandler_HostAddress}}/weatherforecast/
+POST {{SessionHandler_HostAddress}}/sessions/search/
 Accept: application/json
+Content-Type: application/json
 
-###
+{}

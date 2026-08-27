@@ -6,27 +6,20 @@ using SessionHandler.Models;
 namespace SessionHandler.Repositories;
 
 /// <inheritdoc cref="ISessionRepository" />
-public class SessionRepository : ISessionRepository
+public class SessionRepository(SessionDbContext db) : ISessionRepository
 {
-    private readonly SessionDbContext _db;
-
-    public SessionRepository(SessionDbContext db) => _db = db;
-
-    public async Task<Session> AddAsync(Session session, CancellationToken cancellationToken = default)
+    public async Task<Session> Add(Session session, CancellationToken cancellationToken = default)
     {
-        await _db.Sessions.AddAsync(session, cancellationToken);
-        return session;
+        var result = await db.Sessions.AddAsync(session, cancellationToken);
+        return result.Entity;
     }
 
-    public Task<Session?> GetByIdAsync(int id, CancellationToken cancellationToken = default) =>
-        _db.Sessions.FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
-
-    public Task<Session?> GetActiveAsync(
+    public Task<Session?> GetActiveByCompoudId(
         string tenantId,
         string username,
         string ip,
         CancellationToken cancellationToken = default) =>
-        _db.Sessions
+        db.Sessions
             .Where(s => s.LogoutAt == null
                         && s.TenantId == tenantId
                         && s.Username == username
@@ -34,8 +27,8 @@ public class SessionRepository : ISessionRepository
             .OrderByDescending(s => s.LoginAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-    public IQueryable<Session> Query() => _db.Sessions.AsNoTracking();
+    public IQueryable<Session> Query() => db.Sessions.AsNoTracking();
 
-    public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
-        _db.SaveChangesAsync(cancellationToken);
+    public Task<int> SaveChanges(CancellationToken cancellationToken = default) =>
+        db.SaveChangesAsync(cancellationToken);
 }

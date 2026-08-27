@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SessionHandler.Data;
 using SessionHandler.Interfaces;
 using SessionHandler.Repositories;
+using SessionHandler.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +16,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddDbContext<SessionDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("SessionDb")));
 builder.Services.AddScoped<ISessionRepository, SessionRepository>();
+builder.Services.AddScoped<ISessionService, SessionService>();
 
 var app = builder.Build();
 
