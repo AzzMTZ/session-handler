@@ -27,15 +27,15 @@ public class Session
     /// </summary>
     public List<string> Tags { get; set; } = new();
 
-    /// <summary>When the Login event that opened this session occurred.</summary>
-    public DateTimeOffset LoginAt { get; set; }
+    /// <summary>When the Login event that opened this session occurred (UTC).</summary>
+    public DateTime LoginAt { get; set; }
 
-    /// <summary>Timestamp of the most recent Login/Update event applied to this session.</summary>
-    public DateTimeOffset LastSeenAt { get; set; }
+    /// <summary>Timestamp of the most recent Login/Update event applied to this session (UTC).</summary>
+    public DateTime LastSeenAt { get; set; }
 
     /// <summary>
-    /// <c>null</c> while the session is active; set to the Logout event timestamp
+    /// <c>null</c> while the session is active; set to the Logout event timestamp (UTC)
     /// once the session has ended.
     /// </summary>
-    public DateTimeOffset? LogoutAt { get; set; }
+    public DateTime? LogoutAt { get; set; }
 }

@@ -21,9 +21,9 @@ namespace SessionHandler.Migrations
                     Username = table.Column<string>(type: "TEXT", nullable: false),
                     Ip = table.Column<string>(type: "TEXT", nullable: false),
                     Tags = table.Column<string>(type: "TEXT", nullable: false),
-                    LoginAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    LastSeenAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    LogoutAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true)
+                    LoginAt = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    LastSeenAt = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    LogoutAt = table.Column<DateTime>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {

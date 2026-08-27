@@ -11,7 +11,7 @@ using SessionHandler.Data;
 namespace SessionHandler.Migrations
 {
     [DbContext(typeof(SessionDbContext))]
-    [Migration("20260827133927_InitialCreate")]
+    [Migration("20260827141754_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -30,13 +30,13 @@ namespace SessionHandler.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("LastSeenAt")
+                    b.Property<DateTime>("LastSeenAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("LoginAt")
+                    b.Property<DateTime>("LoginAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset?>("LogoutAt")
+                    b.Property<DateTime?>("LogoutAt")
                         .HasColumnType("TEXT");
 
                     b.PrimitiveCollection<string>("Tags")

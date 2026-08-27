@@ -27,13 +27,13 @@ namespace SessionHandler.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("LastSeenAt")
+                    b.Property<DateTime>("LastSeenAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("LoginAt")
+                    b.Property<DateTime>("LoginAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset?>("LogoutAt")
+                    b.Property<DateTime?>("LogoutAt")
                         .HasColumnType("TEXT");
 
                     b.PrimitiveCollection<string>("Tags")

@@ -11,10 +11,10 @@ namespace SessionHandler.Interfaces;
 public interface ISessionRepository
 {
     /// <summary>Stages a new session for insertion.</summary>
-    Task<Session> AddAsync(Session session, CancellationToken cancellationToken = default);
+    Task<Session> Add(Session session, CancellationToken cancellationToken = default);
 
     /// <summary>Loads a tracked session by its surrogate key, or <c>null</c> if none exists.</summary>
-    Task<Session?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+    Task<Session?> GetById(int id, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Loads the tracked active session (<c>LogoutAt is null</c>) for the given identity
@@ -34,5 +34,5 @@ public interface ISessionRepository
     IQueryable<Session> Query();
 
     /// <summary>Flushes staged changes to the database and returns the affected row count.</summary>
-    Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+    Task<int> SaveChanges(CancellationToken cancellationToken = default);
 }
