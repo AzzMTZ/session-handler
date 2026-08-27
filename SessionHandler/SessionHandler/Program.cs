@@ -1,3 +1,8 @@
+using Microsoft.EntityFrameworkCore;
+using SessionHandler.Data;
+using SessionHandler.Interfaces;
+using SessionHandler.Repositories;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -5,6 +10,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+// Session persistence (EF Core + SQLite).
+builder.Services.AddDbContext<SessionDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("SessionDb")));
+builder.Services.AddScoped<ISessionRepository, SessionRepository>();
 
 var app = builder.Build();
 
