@@ -59,3 +59,8 @@ nunit-*.xml
 # JetBrains Rider / IntelliJ
 .idea/
 *.sln.iml
+
+# SQLite database files (created at runtime / by `dotnet ef database update`)
+*.db
+*.db-shm
+*.db-wal
