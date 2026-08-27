@@ -25,6 +25,15 @@ builder.Services.AddScoped<ISessionService, SessionService>();
 
 var app = builder.Build();
 
+// Bring the database schema up to date on startup so a fresh checkout runs with
+// no manual `dotnet ef database update` step. Fine for this single-instance app;
+// a distributed deployment would run migrations as a separate step instead.
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<SessionDbContext>();
+    db.Database.Migrate();
+}
+
 // Configure the HTTP request pipeline.
 app.UseExceptionHandler();
 
