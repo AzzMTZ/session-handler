@@ -4,7 +4,7 @@ namespace SessionHandler.Interfaces;
 
 /// <summary>
 /// Data access layer for <see cref="Session"/> rows. Write methods stage changes on
-/// the underlying context; call <see cref="SaveChangesAsync"/> once per unit of work
+/// the underlying context; call <see cref="SaveChanges"/> once per unit of work
 /// to flush them. <see cref="Query"/> exposes a composable read surface so consumers
 /// can filter on any attribute (or combination, including time).
 /// </summary>
@@ -18,7 +18,7 @@ public interface ISessionRepository
     /// and IP, or <c>null</c> if none is open. Returns the most recently opened one if
     /// duplicates exist.
     /// </summary>
-    Task<Session?> GetActiveByCompoudId(
+    Task<Session?> GetActiveByCompoundId(
         string tenantId,
         string username,
         string ip,

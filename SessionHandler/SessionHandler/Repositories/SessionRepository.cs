@@ -14,7 +14,7 @@ public class SessionRepository(SessionDbContext db) : ISessionRepository
         return result.Entity;
     }
 
-    public Task<Session?> GetActiveByCompoudId(
+    public Task<Session?> GetActiveByCompoundId(
         string tenantId,
         string username,
         string ip,
