@@ -3,8 +3,7 @@ using SessionHandler.Models;
 namespace SessionHandler.Dtos;
 
 /// <summary>Read model returned by the query endpoint.</summary>
-public record SessionDto(
-    int Id,
+public record SessionResponse(
     string TenantId,
     string Username,
     string Ip,
@@ -13,10 +12,7 @@ public record SessionDto(
     DateTime LastSeenAt,
     DateTime? LogoutAt)
 {
-    public bool IsActive => LogoutAt is null;
-
-    public static SessionDto From(Session session) => new(
-        session.Id,
+    public static implicit operator SessionResponse(Session session) => new(
         session.TenantId,
         session.Username,
         session.Ip,

@@ -1,17 +1,16 @@
 using Microsoft.AspNetCore.Mvc;
 using SessionHandler.Dtos;
 using SessionHandler.Interfaces;
-using SessionHandler.Models;
 
 namespace SessionHandler.Controllers;
 
 /// <summary>
 /// Ingestion and query surface for sessions.
 /// <list type="bullet">
-///   <item><c>POST /sessions/login</c> — apply a Login event</item>
-///   <item><c>POST /sessions/update</c> — apply an Update event</item>
-///   <item><c>POST /sessions/logout</c> — apply a Logout event</item>
-///   <item><c>GET /sessions</c> — query active and historical sessions</item>
+///   <item><c>POST /sessions</c> — apply a Login event</item>
+///   <item><c>PUT /sessions</c> — apply an Update event</item>
+///   <item><c>DELETE /sessions</c> — apply a Logout event</item>
+///   <item><c>POST /sessions/search</c> — query active and historical sessions</item>
 /// </list>
 /// </summary>
 [ApiController]
@@ -19,17 +18,17 @@ namespace SessionHandler.Controllers;
 public class SessionsController(ISessionService sessionsService) : ControllerBase
 {
     [HttpPost]
-    public async Task<ActionResult<Session>> Login([FromBody] LoginEvent loginEvent,
+    public async Task<ActionResult<SessionResponse>> Login([FromBody] LoginEvent loginEvent,
         CancellationToken cancellationToken)
     {
-        var createdSession = await sessionsService.Login(loginEvent, cancellationToken);
+        SessionResponse createdSession = await sessionsService.Login(loginEvent, cancellationToken);
         return CreatedAtAction(nameof(Login), createdSession);
     }
 
     [HttpPut]
-    public async Task<ActionResult<Session>> Update([FromBody] UpdateEvent updateEvent, CancellationToken cancellationToken)
+    public async Task<ActionResult<SessionResponse>> Update([FromBody] UpdateEvent updateEvent, CancellationToken cancellationToken)
     {
-        var updatedSession = await sessionsService.Update(updateEvent, cancellationToken);
+        SessionResponse updatedSession = await sessionsService.Update(updateEvent, cancellationToken);
         return Ok(updatedSession);
     }
 
@@ -43,10 +42,10 @@ public class SessionsController(ISessionService sessionsService) : ControllerBas
 
     [HttpPost("search")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult<List<Session>>> Search(
+    public async Task<ActionResult<List<SessionResponse>>> Search(
         [FromBody] SessionQuery query, CancellationToken cancellationToken)
     {
         var results = await sessionsService.Search(query, cancellationToken);
-        return Ok(results);
+        return Ok(results.ConvertAll<SessionResponse>(session => session));
     }
 }
