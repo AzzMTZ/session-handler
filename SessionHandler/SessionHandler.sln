@@ -1,5 +1,4 @@
-﻿
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SessionHandler", "SessionHandler\SessionHandler.csproj", "{DFAB6684-F25E-450D-AB7A-A60CD43FF6B7}"
 EndProject
 Global
