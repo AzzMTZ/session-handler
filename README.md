@@ -265,6 +265,29 @@ Response: `SessionResponse[]` (same shape as the Login response above).
 | Which IPs is user `U` in tenant `T` connected from? | `{ "tenantId": "T", "username": "U" }` → each result's `ip` |
 | Among active sessions, which were logged in at/after 3pm yesterday? | `{ "loginAt": { "since": "2026-08-27T15:00:00Z" } }` |
 
+**Sessions that were active at an instant `T`** — including ones that have since logged
+out — is the one point-in-time question a single filter body can't express. It needs
+`loginAt <= T AND (logoutAt IS NULL OR logoutAt >= T)`, but the `logoutAt` range drops
+still-open sessions. Today this is **two requests, unioned by the caller**:
+
+```jsonc
+// A — still open, started on or before T
+{ "activeOnly": true,  "loginAt": { "until": "2026-08-27T15:00:00Z" } }
+
+// B — started on or before T, closed on or after T
+{ "activeOnly": false,
+  "loginAt":  { "until": "2026-08-27T15:00:00Z" },
+  "logoutAt": { "since": "2026-08-27T15:00:00Z" } }
+```
+
+The two result sets are disjoint — A is `logoutAt: null`, B is not — so the caller
+concatenates them (dedupe by `id` if a Logout may land between the two reads). This returns
+the correct *set* of sessions, but each carries its final tags, not its tags as of `T`.
+Single-call alternatives (`activeAt`, an `allowNull` range flag) and the fuller
+tags-as-of-`T` reconstruction are covered under
+[Alternatives considered](#alternatives-considered) and
+[What I'd do differently](#what-id-do-differently-with-more-time).
+
 ### 3. Query the raw event log — `POST /session-events/search`
 
 Same conventions. Use this for history and finer-grained point-in-time questions (e.g. every
@@ -331,9 +354,11 @@ data-access code is behind repository interfaces and uses no SQLite-specific fea
 a partial index, so swapping in PostgreSQL is a provider change, not a rewrite.
 
 **Point-in-time, today:** the session table gives an efficient **"as of its last update"**
-view of every session, historical ones included — the main use case. Anything finer is
-answered by querying the immutable event log directly. Full "rebuild each session as it was
-at instant T" as a single call is not yet implemented (see
+view of every session, historical ones included — the main use case. "Which sessions were
+open at instant `T`" is a union of two `/sessions/search` calls (shown under
+[How a consumer uses the API](#how-a-consumer-uses-the-api)); anything finer is answered by
+querying the immutable event log directly. Full "rebuild each session as it was at instant
+`T`" as a single call is not yet implemented (see
 [What I'd do differently](#what-id-do-differently-with-more-time)).
 
 ---
@@ -343,6 +368,7 @@ at instant T" as a single call is not yet implemented (see
 | Option | Decision | Why |
 | --- | --- | --- |
 | **GraphQL** for the query surface | Rejected | A genuinely good fit for "query any combination of fields", but the schema, resolver and tooling overhead wasn't worth it at this scope. `POST /search` with a typed filter covers the same need. |
+| **Single-call "sessions active at `T`"** — an `activeAt: T` field, or an `allowNull` flag on the `logoutAt` range | Deferred | Both fold the [two-request union](#2-query-sessions--post-sessionssearch) into one call. `activeAt` is the better of the two: one self-describing field that supersedes the `activeOnly` default. `allowNull` is a modifier that's only meaningful on the single nullable date field and reads as nonsense with an `until` bound. Neither earns its surface area for a query the brief's examples don't ask for, and `activeAt` still answers only *which* sessions, not their state at `T`. The two-request recipe covers the need today. |
 | **PostgreSQL** | Rejected for now | The right production choice, but it needs a running server and buys nothing while clustering / multi-instance is out of scope. Kept the persistence layer provider-agnostic so this is an easy switch. |
 | **Redis cache** for the active-session set | Rejected | Adds an external dependency and cache-coherency logic for a single-process service. Not justified at this scale. |
 | **In-memory cache** for the active-session set | Rejected | Every process restart would need to replay the event log to rebuild current state before the service could answer queries — a cold-start availability gap. Reading active sessions straight from the indexed table avoids it. |
@@ -390,12 +416,13 @@ at instant T" as a single call is not yet implemented (see
 
 ## What I'd do differently with more time
 
-1. **First-class point-in-time session queries.** Add `since` / `until` bounds to
-   `POST /sessions/search` that reconstruct sessions *as they were* in that window: query the
-   `SessionEvents` table joined to `Sessions` for each session's last-update time, dedupe to
-   the latest event per session within the range, project a `Session` from each, and return
-   that list. This makes "who was connected, and with which tags, at 3pm yesterday" a single
-   call instead of a manual event-log assembly.
+1. **First-class point-in-time session queries.** Two levels. The cheap one: an `activeAt: T`
+   field that returns the *set* of sessions open at `T` in a single call, replacing the
+   current [two-request union](#2-query-sessions--post-sessionssearch). The fuller one:
+   reconstruct sessions *as they were* at `T` — query the `SessionEvents` table joined to
+   `Sessions` for each session's last event at or before `T`, project a `Session` (tags
+   included) from each, and return that list. This makes "who was connected, and with which
+   tags, at 3pm yesterday" a single call instead of a manual event-log assembly.
 2. **Queue-based ingestion** — a broker plus a worker to decouple accept from process and
    absorb bursts, once throughput justifies it.
 3. **Bulk ingestion endpoint** — accept a batch of events in one request.
