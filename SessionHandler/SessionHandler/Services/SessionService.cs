@@ -68,6 +68,19 @@ public class SessionService(ISessionRepository repository) : ISessionService
         await repository.SaveChanges(cancellationToken);
     }
 
+    public async Task<Session> Get(
+        string tenantId, string username, string ip, CancellationToken cancellationToken = default)
+    {
+        var active = await repository.GetActiveByCompoundId(tenantId, username, ip, cancellationToken);
+
+        if (active is null)
+        {
+            throw new SessionNotFoundException(tenantId, username, ip);
+        }
+
+        return active;
+    }
+
     public async Task<List<Session>> Search(
         SessionQuery query, CancellationToken cancellationToken = default)
     {
@@ -97,7 +110,8 @@ public class SessionService(ISessionRepository repository) : ISessionService
                 );
         }
 
-        if (query.ActiveOnly == true)
+        // Active-only unless the caller explicitly opts out with ActiveOnly: false.
+        if (query.ActiveOnly != false)
         {
             sessions = sessions.Where(s => s.LogoutAt == null);
         }
