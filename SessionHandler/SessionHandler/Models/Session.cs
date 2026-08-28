@@ -18,7 +18,6 @@ public class Session
     /// <summary>Identifies the user within a tenant.</summary>
     public string Username { get; set; } = null!;
 
-    /// <summary>IP address the user connected from.</summary>
     public string Ip { get; set; } = null!;
 
     /// <summary>

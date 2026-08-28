@@ -4,13 +4,8 @@ using SessionHandler.Models;
 namespace SessionHandler.Data;
 
 /// <summary>
-/// EF Core database context for session persistence, following the structure in
-/// https://learn.microsoft.com/en-us/ef/core/get-started/overview/first-app
-/// (entity type + <see cref="DbSet{TEntity}"/> + migrations). The only deviation
-/// from that tutorial is the connection wiring: because this is an ASP.NET Core
-/// app the connection string is supplied by dependency injection
-/// (<c>AddDbContext</c> + <c>UseSqlite</c> in <c>Program.cs</c>) instead of an
-/// <c>OnConfiguring</c> override.
+/// EF Core context for session persistence. The connection string is supplied by DI
+/// (<c>AddDbContext</c> + <c>UseSqlite</c> in <c>Program.cs</c>), not an <c>OnConfiguring</c> override.
 /// </summary>
 public class SessionDbContext : DbContext
 {
