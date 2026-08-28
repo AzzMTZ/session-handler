@@ -4,6 +4,7 @@ namespace SessionHandler.Dtos;
 
 /// <summary>Read model returned by the session endpoints.</summary>
 public record SessionResponse(
+    int Id,
     string TenantId,
     string Username,
     string Ip,
@@ -13,6 +14,7 @@ public record SessionResponse(
     DateTime? LogoutAt)
 {
     public static implicit operator SessionResponse(Session session) => new(
+        session.Id,
         session.TenantId,
         session.Username,
         session.Ip,

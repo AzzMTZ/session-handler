@@ -16,6 +16,8 @@ public class SessionDbContext : DbContext
 
     public DbSet<Session> Sessions => Set<Session>();
 
+    public DbSet<SessionEvent> SessionEvents => Set<SessionEvent>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Session>(session =>
@@ -31,6 +33,32 @@ public class SessionDbContext : DbContext
 
             // Backs "active sessions only" filtering used by most queries.
             session.HasIndex(s => s.LogoutAt);
+        });
+
+        modelBuilder.Entity<SessionEvent>(sessionEvent =>
+        {
+            sessionEvent.HasKey(e => e.Id);
+
+            sessionEvent.Property(e => e.TenantId).IsRequired();
+            sessionEvent.Property(e => e.Username).IsRequired();
+            sessionEvent.Property(e => e.Ip).IsRequired();
+
+            sessionEvent.HasOne(e => e.Session)
+                .WithMany()
+                .HasForeignKey(e => e.SessionId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Backs "history for this exact session" — the common case.
+            sessionEvent.HasIndex(e => e.SessionId);
+
+            // Backs the same identity/IP lookups as Sessions, applied to events.
+            sessionEvent.HasIndex(e => new { e.TenantId, e.Username, e.Ip });
+
+            // Backs "all events of this type" (e.g. tag-change history via Type == Update).
+            sessionEvent.HasIndex(e => e.Type);
+
+            // Backs time-range filtering.
+            sessionEvent.HasIndex(e => e.Timestamp);
         });
     }
 }

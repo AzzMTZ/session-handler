@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using SessionHandler.Data;
 using SessionHandler.Exceptions;
@@ -7,7 +8,9 @@ using SessionHandler.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    // Serialize enums (e.g. SessionEvent.Type) as their names, not integers.
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
@@ -20,6 +23,8 @@ builder.Services.AddDbContext<SessionDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("SessionDb")));
 builder.Services.AddScoped<ISessionRepository, SessionRepository>();
 builder.Services.AddScoped<ISessionService, SessionService>();
+builder.Services.AddScoped<ISessionEventRepository, SessionEventRepository>();
+builder.Services.AddScoped<ISessionEventService, SessionEventService>();
 
 var app = builder.Build();
 

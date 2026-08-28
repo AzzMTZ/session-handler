@@ -7,7 +7,14 @@ using SessionHandler.Models;
 namespace SessionHandler.Services;
 
 /// <inheritdoc cref="ISessionService" />
-public class SessionService(ISessionRepository repository) : ISessionService
+/// <remarks>
+/// Login/Update/Logout each stage a <see cref="SessionEvent"/> row alongside the
+/// session mutation itself, via <paramref name="eventRepository"/>. Both repositories
+/// wrap the same scoped <c>SessionDbContext</c>, so the single <c>SaveChanges</c> call
+/// at the end of each method flushes both as one atomic transaction — an event is
+/// never recorded without its session change committing, or vice versa.
+/// </remarks>
+public class SessionService(ISessionRepository repository, ISessionEventRepository eventRepository) : ISessionService
 {
     public async Task<Session> Login(LoginEvent loginEvent, CancellationToken cancellationToken = default)
     {
@@ -30,6 +37,19 @@ public class SessionService(ISessionRepository repository) : ISessionService
             LastSeenAt = timestamp,
         }, cancellationToken);
 
+        // Session.Id isn't assigned until SaveChanges runs, so the event links to it via
+        // the tracked Session reference rather than a not-yet-known SessionId — EF Core's
+        // change tracker fixes up the foreign key once the insert order is resolved.
+        await eventRepository.Add(new SessionEvent
+        {
+            Session = active,
+            TenantId = loginEvent.TenantId,
+            Username = loginEvent.Username,
+            Ip = loginEvent.Ip,
+            Tags = loginEvent.Tags.ToList(),
+            Timestamp = timestamp,
+            Type = SessionEventType.Login,
+        }, cancellationToken);
 
         await repository.SaveChanges(cancellationToken);
         return active;
@@ -45,10 +65,22 @@ public class SessionService(ISessionRepository repository) : ISessionService
             throw new SessionNotFoundException(updateEvent.TenantId, updateEvent.Username, updateEvent.Ip);
         }
 
+        var timestamp = AsUtc(updateEvent.Timestamp);
         active.Tags = updateEvent.Tags.ToList();
-        UpdateLastSeenAt(active, AsUtc(updateEvent.Timestamp));
-        await repository.SaveChanges(cancellationToken);
+        UpdateLastSeenAt(active, timestamp);
 
+        await eventRepository.Add(new SessionEvent
+        {
+            Session = active,
+            TenantId = updateEvent.TenantId,
+            Username = updateEvent.Username,
+            Ip = updateEvent.Ip,
+            Tags = updateEvent.Tags.ToList(),
+            Timestamp = timestamp,
+            Type = SessionEventType.Update,
+        }, cancellationToken);
+
+        await repository.SaveChanges(cancellationToken);
         return active;
     }
 
@@ -65,6 +97,20 @@ public class SessionService(ISessionRepository repository) : ISessionService
 
         active.LogoutAt = timestamp;
         UpdateLastSeenAt(active, timestamp);
+
+        // No Tags: Logout doesn't carry them, and the session's tags at close are
+        // already on the preceding Login/Update events for anyone who needs them.
+        await eventRepository.Add(new SessionEvent
+        {
+            Session = active,
+            TenantId = logoutEvent.TenantId,
+            Username = logoutEvent.Username,
+            Ip = logoutEvent.Ip,
+            Tags = null,
+            Timestamp = timestamp,
+            Type = SessionEventType.Logout,
+        }, cancellationToken);
+
         await repository.SaveChanges(cancellationToken);
     }
 
