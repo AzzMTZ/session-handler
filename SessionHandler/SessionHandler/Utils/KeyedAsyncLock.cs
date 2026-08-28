@@ -41,14 +41,35 @@ public class KeyedAsyncLock<TKey> where TKey : notnull
             }
         }
 
-        await entry.Semaphore.WaitAsync(cancellationToken);
+        try
+        {
+            await entry.Semaphore.WaitAsync(cancellationToken);
+        }
+        catch
+        {
+            // WaitAsync never granted a permit here (cancellation is the realistic
+            // case - RequestAborted firing while queued behind another operation on
+            // the same identity), so this claim on the entry must be given back the
+            // same way a real release would, or a cancelled acquire attempt would
+            // leak RefCount forever and the entry could never be removed again. Must
+            // not call entry.Semaphore.Release() here: no permit was taken, so
+            // releasing one would hand out a phantom permit to whoever is genuinely
+            // holding it, breaking mutual exclusion.
+            DecrementAndRemoveIfUnused(key, entry);
+            throw;
+        }
+
         return new Releaser(this, key, entry);
     }
 
     private void Release(TKey key, Entry entry)
     {
         entry.Semaphore.Release();
+        DecrementAndRemoveIfUnused(key, entry);
+    }
 
+    private void DecrementAndRemoveIfUnused(TKey key, Entry entry)
+    {
         lock (_gate)
         {
             entry.RefCount--;
