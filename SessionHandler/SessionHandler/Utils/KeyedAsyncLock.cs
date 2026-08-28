@@ -21,7 +21,7 @@ public class KeyedAsyncLock<TKey> where TKey : notnull
             _ => new Entry(),
             (_, existing) =>
             {
-                existing.RefCount++;
+                Interlocked.Increment(ref existing.RefCount);
                 return existing;
             });
 
@@ -33,16 +33,15 @@ public class KeyedAsyncLock<TKey> where TKey : notnull
     {
         entry.Semaphore.Release();
 
-        lock (entry)
+        // Interlocked.Decrement both mutates and returns the post-decrement value
+        // atomically, so this check-then-remove can't race with the increment above
+        // (which happens on a different code path, not covered by any shared lock).
+        if (Interlocked.Decrement(ref entry.RefCount) == 0)
         {
-            entry.RefCount--;
-            if (entry.RefCount == 0)
-            {
-                // Only removes if the dictionary still holds this exact instance, so a
-                // concurrent LockAsync that already re-added this key isn't dropped.
-                ((ICollection<KeyValuePair<TKey, Entry>>)_entries)
-                    .Remove(new KeyValuePair<TKey, Entry>(key, entry));
-            }
+            // Only removes if the dictionary still holds this exact instance, so a
+            // concurrent LockAsync that already re-added this key isn't dropped.
+            ((ICollection<KeyValuePair<TKey, Entry>>)_entries)
+                .Remove(new KeyValuePair<TKey, Entry>(key, entry));
         }
     }
 
