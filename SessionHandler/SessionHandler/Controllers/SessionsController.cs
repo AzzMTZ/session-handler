@@ -9,6 +9,7 @@ namespace SessionHandler.Controllers;
 /// <list type="bullet">
 ///   <item><c>POST /sessions</c> — apply a Login event</item>
 ///   <item><c>GET /sessions/{tenantId}/{username}/{ip}</c> — fetch the active session for an identity</item>
+///   <item><c>GET /sessions/{id}</c> — fetch a session (active or historical) by its surrogate id</item>
 ///   <item><c>PUT /sessions/{tenantId}/{username}/{ip}</c> — apply an Update event</item>
 ///   <item><c>DELETE /sessions/{tenantId}/{username}/{ip}</c> — apply a Logout event</item>
 ///   <item><c>POST /sessions/search</c> — query active and historical sessions</item>
@@ -43,6 +44,20 @@ public class SessionsController(ISessionService sessionsService) : ControllerBas
         string tenantId, string username, string ip, CancellationToken cancellationToken)
     {
         SessionResponse session = await sessionsService.Get(tenantId, username, ip, cancellationToken);
+        return Ok(session);
+    }
+
+    /// <summary>
+    /// Looks up a session by its surrogate id (as returned in <see cref="SessionResponse.Id"/>),
+    /// active or historical — unlike <see cref="Get"/>, which only ever resolves the active
+    /// session for an identity triple.
+    /// </summary>
+    [HttpGet("{id:int}")]
+    [ProducesResponseType<SessionResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<SessionResponse>> GetById(int id, CancellationToken cancellationToken)
+    {
+        SessionResponse session = await sessionsService.GetById(id, cancellationToken);
         return Ok(session);
     }
 

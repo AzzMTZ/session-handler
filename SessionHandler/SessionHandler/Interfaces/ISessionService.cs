@@ -33,5 +33,11 @@ public interface ISessionService
     /// </summary>
     Task<Session> Get(string tenantId, string username, string ip, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Returns the session with the given surrogate id, active or historical, or throws
+    /// <see cref="Exceptions.SessionNotFoundException"/> if none exists.
+    /// </summary>
+    Task<Session> GetById(int id, CancellationToken cancellationToken = default);
+
     Task<List<Session>> Search(SessionQuery query, CancellationToken cancellationToken = default);
 }

@@ -127,6 +127,18 @@ public class SessionService(ISessionRepository repository, ISessionEventReposito
         return active;
     }
 
+    public async Task<Session> GetById(int id, CancellationToken cancellationToken = default)
+    {
+        var session = await repository.GetById(id, cancellationToken);
+
+        if (session is null)
+        {
+            throw new SessionNotFoundException(id);
+        }
+
+        return session;
+    }
+
     public async Task<List<Session>> Search(
         SessionQuery query, CancellationToken cancellationToken = default)
     {
