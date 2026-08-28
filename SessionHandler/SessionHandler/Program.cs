@@ -62,3 +62,8 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Exposed so the e2e test project's WebApplicationFactory<Program> has a public entry
+// point to bootstrap the host against. Top-level statements otherwise emit an internal
+// Program class the test assembly can't see without InternalsVisibleTo.
+public partial class Program;

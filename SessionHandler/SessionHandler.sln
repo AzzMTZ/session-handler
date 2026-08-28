@@ -1,6 +1,8 @@
 ﻿Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SessionHandler", "SessionHandler\SessionHandler.csproj", "{DFAB6684-F25E-450D-AB7A-A60CD43FF6B7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SessionHandler.Tests", "SessionHandler.Tests\SessionHandler.Tests.csproj", "{06290D4C-34DF-48A8-A80D-A3A0460EAEBA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -11,5 +13,9 @@ Global
 		{DFAB6684-F25E-450D-AB7A-A60CD43FF6B7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DFAB6684-F25E-450D-AB7A-A60CD43FF6B7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DFAB6684-F25E-450D-AB7A-A60CD43FF6B7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{06290D4C-34DF-48A8-A80D-A3A0460EAEBA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{06290D4C-34DF-48A8-A80D-A3A0460EAEBA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{06290D4C-34DF-48A8-A80D-A3A0460EAEBA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{06290D4C-34DF-48A8-A80D-A3A0460EAEBA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
