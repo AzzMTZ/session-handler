@@ -12,9 +12,10 @@ namespace SessionHandler.Services;
 /// <remarks>
 /// Login/Update/Logout each stage a <see cref="SessionEvent"/> row alongside the
 /// session mutation itself, via <paramref name="eventRepository"/>. Both repositories
-/// wrap the same scoped <c>SessionDbContext</c>, so the single <c>SaveChanges</c> call
-/// at the end of each method flushes both as one atomic transaction — an event is
-/// never recorded without its session change committing, or vice versa.
+/// wrap the same scoped <c>SessionDbContext</c>, so the single <paramref name="unitOfWork"/>
+/// <c>SaveChanges</c> call at the end of each method flushes both as one atomic
+/// transaction — an event is never recorded without its session change committing,
+/// or vice versa.
 ///
 /// Each method also holds <paramref name="locks"/> for the identity triple for its
 /// whole read-decide-write sequence, so two concurrent requests for the same
@@ -31,6 +32,7 @@ namespace SessionHandler.Services;
 public class SessionService(
     ISessionRepository repository,
     ISessionEventRepository eventRepository,
+    IUnitOfWork unitOfWork,
     KeyedAsyncLock<(string TenantId, string Username, string Ip)> locks)
     : ISessionService
 {
@@ -74,7 +76,7 @@ public class SessionService(
 
         try
         {
-            await repository.SaveChanges(cancellationToken);
+            await unitOfWork.SaveChanges(cancellationToken);
         }
         catch (DbUpdateException ex) when (ex.InnerException is SqliteException { SqliteExtendedErrorCode: 2067 })
         {
@@ -123,7 +125,7 @@ public class SessionService(
             Type = SessionEventType.Update,
         }, cancellationToken);
 
-        await repository.SaveChanges(cancellationToken);
+        await unitOfWork.SaveChanges(cancellationToken);
         return active;
     }
 
@@ -164,7 +166,7 @@ public class SessionService(
             Type = SessionEventType.Logout,
         }, cancellationToken);
 
-        await repository.SaveChanges(cancellationToken);
+        await unitOfWork.SaveChanges(cancellationToken);
     }
 
     public async Task<Session> GetById(int id, CancellationToken cancellationToken = default)
