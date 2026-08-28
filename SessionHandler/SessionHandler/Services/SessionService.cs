@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using SessionHandler.Dtos;
 using SessionHandler.Exceptions;
@@ -14,11 +15,30 @@ namespace SessionHandler.Services;
 /// wrap the same scoped <c>SessionDbContext</c>, so the single <c>SaveChanges</c> call
 /// at the end of each method flushes both as one atomic transaction — an event is
 /// never recorded without its session change committing, or vice versa.
+///
+/// Each method also holds <paramref name="locks"/> for the identity triple for its
+/// whole read-decide-write sequence, so two concurrent requests for the same
+/// <c>(TenantId, Username, Ip)</c> can't interleave: without it, two concurrent Logins
+/// could both observe "no active session" and both insert one, and two concurrent
+/// Updates could both load the same row and the slower one's write would silently
+/// overwrite the faster one's (a classic lost update — nothing here uses an optimistic
+/// concurrency token). This is sufficient because the app runs as a single process;
+/// it would not protect against a second instance in a horizontally-scaled deployment,
+/// which is explicitly out of scope. The partial unique index backing
+/// <see cref="SessionAlreadyExistsException"/> in <see cref="Login"/> is a second,
+/// database-enforced line of defense for the same invariant.
 /// </remarks>
-public class SessionService(ISessionRepository repository, ISessionEventRepository eventRepository) : ISessionService
+public class SessionService(
+    ISessionRepository repository,
+    ISessionEventRepository eventRepository,
+    KeyedAsyncLock<(string TenantId, string Username, string Ip)> locks)
+    : ISessionService
 {
     public async Task<Session> Login(LoginEvent loginEvent, CancellationToken cancellationToken = default)
     {
+        using var _ = await locks.LockAsync(
+            (loginEvent.TenantId, loginEvent.Username, loginEvent.Ip), cancellationToken);
+
         var timestamp = loginEvent.Timestamp.AsUtc();
         var active = await repository.GetActiveByCompoundId(
             loginEvent.TenantId, loginEvent.Username, loginEvent.Ip, cancellationToken);
@@ -52,12 +72,27 @@ public class SessionService(ISessionRepository repository, ISessionEventReposito
             Type = SessionEventType.Login,
         }, cancellationToken);
 
-        await repository.SaveChanges(cancellationToken);
+        try
+        {
+            await repository.SaveChanges(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is SqliteException { SqliteExtendedErrorCode: 2067 })
+        {
+            // 2067 = SQLITE_CONSTRAINT_UNIQUE, from the partial unique index on
+            // (TenantId, Username, Ip) WHERE LogoutAt IS NULL. The lock above should make
+            // this unreachable in practice; this is only a friendly fallback in case some
+            // future code path ever writes a Session without going through it.
+            throw new SessionAlreadyExistsException(loginEvent.TenantId, loginEvent.Username, loginEvent.Ip);
+        }
+
         return active;
     }
 
     public async Task<Session> Update(UpdateEvent updateEvent, CancellationToken cancellationToken = default)
     {
+        using var _ = await locks.LockAsync(
+            (updateEvent.TenantId, updateEvent.Username, updateEvent.Ip), cancellationToken);
+
         var active = await repository.GetActiveByCompoundId(
             updateEvent.TenantId, updateEvent.Username, updateEvent.Ip, cancellationToken);
 
@@ -67,8 +102,15 @@ public class SessionService(ISessionRepository repository, ISessionEventReposito
         }
 
         var timestamp = updateEvent.Timestamp.AsUtc();
-        active.Tags = updateEvent.Tags.ToList();
-        UpdateLastSeenAt(active, timestamp);
+
+        // The event itself is always recorded below, even if it arrived out of order;
+        // only the session's current state should reflect whichever event is
+        // chronologically latest, not whichever happened to be applied last.
+        if (timestamp >= active.LastSeenAt)
+        {
+            active.Tags = updateEvent.Tags.ToList();
+            active.LastSeenAt = timestamp;
+        }
 
         await eventRepository.Add(new SessionEvent
         {
@@ -87,6 +129,9 @@ public class SessionService(ISessionRepository repository, ISessionEventReposito
 
     public async Task Logout(LogoutEvent logoutEvent, CancellationToken cancellationToken = default)
     {
+        using var _ = await locks.LockAsync(
+            (logoutEvent.TenantId, logoutEvent.Username, logoutEvent.Ip), cancellationToken);
+
         var timestamp = logoutEvent.Timestamp.AsUtc();
         var active = await repository.GetActiveByCompoundId(
             logoutEvent.TenantId, logoutEvent.Username, logoutEvent.Ip, cancellationToken);
@@ -96,8 +141,15 @@ public class SessionService(ISessionRepository repository, ISessionEventReposito
             throw new SessionNotFoundException(logoutEvent.TenantId, logoutEvent.Username, logoutEvent.Ip);
         }
 
+        // Unlike Update, Logout always closes the session regardless of timestamp
+        // ordering: it's a terminal transition, and ignoring an out-of-order Logout
+        // would leave the session stuck open indefinitely. LastSeenAt still only moves
+        // forward, so an out-of-order Logout can't rewind it.
         active.LogoutAt = timestamp;
-        UpdateLastSeenAt(active, timestamp);
+        if (timestamp > active.LastSeenAt)
+        {
+            active.LastSeenAt = timestamp;
+        }
 
         // No Tags: Logout doesn't carry them, and the session's tags at close are
         // already on the preceding Login/Update events for anyone who needs them.
@@ -203,17 +255,5 @@ public class SessionService(ISessionRepository repository, ISessionEventReposito
             .ToListAsync(cancellationToken);
 
         return results;
-    }
-
-    /// <summary>
-    /// Advances the session's last-seen timestamp. The value only ever moves forward,
-    /// so an out-of-order event cannot rewind it.
-    /// </summary>
-    private static void UpdateLastSeenAt(Session session, DateTime timestamp)
-    {
-        if (timestamp > session.LastSeenAt)
-        {
-            session.LastSeenAt = timestamp;
-        }
     }
 }

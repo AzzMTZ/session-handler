@@ -5,6 +5,7 @@ using SessionHandler.Exceptions;
 using SessionHandler.Interfaces;
 using SessionHandler.Repositories;
 using SessionHandler.Services;
+using SessionHandler.Utils;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,6 +26,10 @@ builder.Services.AddScoped<ISessionRepository, SessionRepository>();
 builder.Services.AddScoped<ISessionService, SessionService>();
 builder.Services.AddScoped<ISessionEventRepository, SessionEventRepository>();
 builder.Services.AddScoped<ISessionEventService, SessionEventService>();
+
+// Singleton: serializes Login/Update/Logout per identity triple across the whole
+// process, so it must outlive any one request/scope to actually prevent races.
+builder.Services.AddSingleton<KeyedAsyncLock<(string TenantId, string Username, string Ip)>>();
 
 var app = builder.Build();
 
