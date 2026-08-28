@@ -8,6 +8,10 @@
 
     <ItemGroup>
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
+        <!-- Override the version Microsoft.AspNetCore.OpenApi 10.0.2 pulls in
+             transitively (2.0.0): everything up to 2.7.4 carries GHSA-v5pm-xwqc-g5wc
+             (NU1903); 2.7.5 is the first patched release on the 2.x line. -->
+        <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11">
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
           <PrivateAssets>all</PrivateAssets>
