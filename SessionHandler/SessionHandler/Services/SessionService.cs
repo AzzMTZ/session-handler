@@ -10,24 +10,13 @@ namespace SessionHandler.Services;
 
 /// <inheritdoc cref="ISessionService" />
 /// <remarks>
-/// Login/Update/Logout each stage a <see cref="SessionEvent"/> row alongside the
-/// session mutation itself, via <paramref name="eventRepository"/>. Both repositories
-/// wrap the same scoped <c>SessionDbContext</c>, so the single <paramref name="unitOfWork"/>
-/// <c>SaveChanges</c> call at the end of each method flushes both as one atomic
-/// transaction — an event is never recorded without its session change committing,
-/// or vice versa.
-///
-/// Each method also holds <paramref name="locks"/> for the identity triple for its
-/// whole read-decide-write sequence, so two concurrent requests for the same
-/// <c>(TenantId, Username, Ip)</c> can't interleave: without it, two concurrent Logins
-/// could both observe "no active session" and both insert one, and two concurrent
-/// Updates could both load the same row and the slower one's write would silently
-/// overwrite the faster one's (a classic lost update — nothing here uses an optimistic
-/// concurrency token). This is sufficient because the app runs as a single process;
-/// it would not protect against a second instance in a horizontally-scaled deployment,
-/// which is explicitly out of scope. The partial unique index backing
-/// <see cref="SessionAlreadyExistsException"/> in <see cref="Login"/> is a second,
-/// database-enforced line of defense for the same invariant.
+/// Login/Update/Logout each stage a <see cref="SessionEvent"/> next to the session
+/// mutation and commit both through the one <paramref name="unitOfWork"/>, so they
+/// land as a single transaction. Each also holds <paramref name="locks"/> on the
+/// identity triple across its whole read-decide-write, so concurrent requests for the
+/// same <c>(TenantId, Username, Ip)</c> can't race (double-insert on Login, lost
+/// update on Update). Single-process only; the partial unique index behind
+/// <see cref="SessionAlreadyExistsException"/> is the database-level backstop.
 /// </remarks>
 public class SessionService(
     ISessionRepository repository,
@@ -60,9 +49,8 @@ public class SessionService(
             LastSeenAt = timestamp,
         }, cancellationToken);
 
-        // Session.Id isn't assigned until SaveChanges runs, so the event links to it via
-        // the tracked Session reference rather than a not-yet-known SessionId — EF Core's
-        // change tracker fixes up the foreign key once the insert order is resolved.
+        // Link via the tracked Session reference, not SessionId: the id isn't assigned
+        // until SaveChanges, and EF Core fixes up the FK on insert.
         await eventRepository.Add(new SessionEvent
         {
             Session = active,
@@ -80,10 +68,8 @@ public class SessionService(
         }
         catch (DbUpdateException ex) when (ex.InnerException is SqliteException { SqliteExtendedErrorCode: 2067 })
         {
-            // 2067 = SQLITE_CONSTRAINT_UNIQUE, from the partial unique index on
-            // (TenantId, Username, Ip) WHERE LogoutAt IS NULL. The lock above should make
-            // this unreachable in practice; this is only a friendly fallback in case some
-            // future code path ever writes a Session without going through it.
+            // 2067 = SQLITE_CONSTRAINT_UNIQUE on the partial unique index. The lock above
+            // should make this unreachable; it's a fallback for writes that bypass it.
             throw new SessionAlreadyExistsException(loginEvent.TenantId, loginEvent.Username, loginEvent.Ip);
         }
 
@@ -105,9 +91,8 @@ public class SessionService(
 
         var timestamp = updateEvent.Timestamp.AsUtc();
 
-        // The event itself is always recorded below, even if it arrived out of order;
-        // only the session's current state should reflect whichever event is
-        // chronologically latest, not whichever happened to be applied last.
+        // Only fold an in-order event into current state; the event row itself is
+        // always recorded below regardless of arrival order.
         if (timestamp >= active.LastSeenAt)
         {
             active.Tags = updateEvent.Tags.ToList();
@@ -143,10 +128,8 @@ public class SessionService(
             throw new SessionNotFoundException(logoutEvent.TenantId, logoutEvent.Username, logoutEvent.Ip);
         }
 
-        // Unlike Update, Logout always closes the session regardless of timestamp
-        // ordering: it's a terminal transition, and ignoring an out-of-order Logout
-        // would leave the session stuck open indefinitely. LastSeenAt still only moves
-        // forward, so an out-of-order Logout can't rewind it.
+        // Logout always closes the session, even out of order — a terminal transition,
+        // otherwise the session could stay open forever. LastSeenAt still only advances.
         active.LogoutAt = timestamp;
         if (timestamp > active.LastSeenAt)
         {

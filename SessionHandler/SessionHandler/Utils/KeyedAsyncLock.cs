@@ -1,23 +1,15 @@
 namespace SessionHandler.Utils;
 
 /// <summary>
-/// Per-key async mutual exclusion, registered as a singleton. Serializes operations
-/// that share a key (e.g. the same session identity triple, passed as a value tuple —
-/// no string concatenation, so there's no risk of two different keys colliding into
-/// the same lock) without blocking operations on unrelated keys. Entries are removed
-/// once uncontended so the backing dictionary doesn't grow unbounded across the
-/// lifetime of the process.
+/// Per-key async mutual exclusion, registered as a singleton. Operations sharing a key
+/// run serially; unrelated keys never block each other. Entries are dropped once
+/// uncontended so <see cref="_entries"/> stays bounded.
 ///
-/// The dictionary lookup and the ref-count increment/decrement are guarded by one
-/// plain lock (<see cref="_gate"/>) rather than a lock-free <c>ConcurrentDictionary</c>
-/// with <c>Interlocked</c> counters: those are two different atomicity mechanisms that
-/// don't coordinate with each other, which is exactly what let a ref count reach zero
-/// and get removed from the dictionary in the same instant a new caller had just
-/// incremented it back to one — silently splitting one logical lock into two. A single
-/// lock around the whole "check refcount, decide" sequence on both the acquire and
-/// release side closes that gap entirely. It's only ever held for O(1) dictionary
-/// bookkeeping, never across the actual <c>await Semaphore.WaitAsync</c>, so unrelated
-/// keys still never block on each other for any meaningful duration.
+/// One plain lock (<see cref="_gate"/>) guards both the dictionary lookup and the
+/// ref-count change, so a count can't hit zero and be removed in the same instant
+/// another caller increments it back — the race a <c>ConcurrentDictionary</c> +
+/// <c>Interlocked</c> split would allow. The gate is never held across
+/// <c>Semaphore.WaitAsync</c>.
 /// </summary>
 public class KeyedAsyncLock<TKey> where TKey : notnull
 {
@@ -47,14 +39,9 @@ public class KeyedAsyncLock<TKey> where TKey : notnull
         }
         catch
         {
-            // WaitAsync never granted a permit here (cancellation is the realistic
-            // case - RequestAborted firing while queued behind another operation on
-            // the same identity), so this claim on the entry must be given back the
-            // same way a real release would, or a cancelled acquire attempt would
-            // leak RefCount forever and the entry could never be removed again. Must
-            // not call entry.Semaphore.Release() here: no permit was taken, so
-            // releasing one would hand out a phantom permit to whoever is genuinely
-            // holding it, breaking mutual exclusion.
+            // Cancelled while queued: no permit was granted, so give back the RefCount
+            // claim (else the entry leaks) but do NOT Release the semaphore — that
+            // would hand a phantom permit to the real holder.
             DecrementAndRemoveIfUnused(key, entry);
             throw;
         }

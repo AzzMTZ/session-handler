@@ -4,9 +4,8 @@ using SessionHandler.Models;
 namespace SessionHandler.Interfaces;
 
 /// <summary>
-/// Read-only query surface over recorded session events. Events are written as a
-/// side effect of <see cref="ISessionService"/>'s Login/Update/Logout methods, not
-/// through this interface — see its remarks for why.
+/// Read-only query surface over recorded session events. Events are written only as a
+/// side effect of <see cref="ISessionService"/>'s Login/Update/Logout, never here.
 /// </summary>
 public interface ISessionEventService
 {
