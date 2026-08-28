@@ -3,6 +3,7 @@ using SessionHandler.Dtos;
 using SessionHandler.Exceptions;
 using SessionHandler.Interfaces;
 using SessionHandler.Models;
+using SessionHandler.Utils;
 
 namespace SessionHandler.Services;
 
@@ -18,7 +19,7 @@ public class SessionService(ISessionRepository repository, ISessionEventReposito
 {
     public async Task<Session> Login(LoginEvent loginEvent, CancellationToken cancellationToken = default)
     {
-        var timestamp = AsUtc(loginEvent.Timestamp);
+        var timestamp = loginEvent.Timestamp.AsUtc();
         var active = await repository.GetActiveByCompoundId(
             loginEvent.TenantId, loginEvent.Username, loginEvent.Ip, cancellationToken);
 
@@ -65,7 +66,7 @@ public class SessionService(ISessionRepository repository, ISessionEventReposito
             throw new SessionNotFoundException(updateEvent.TenantId, updateEvent.Username, updateEvent.Ip);
         }
 
-        var timestamp = AsUtc(updateEvent.Timestamp);
+        var timestamp = updateEvent.Timestamp.AsUtc();
         active.Tags = updateEvent.Tags.ToList();
         UpdateLastSeenAt(active, timestamp);
 
@@ -86,7 +87,7 @@ public class SessionService(ISessionRepository repository, ISessionEventReposito
 
     public async Task Logout(LogoutEvent logoutEvent, CancellationToken cancellationToken = default)
     {
-        var timestamp = AsUtc(logoutEvent.Timestamp);
+        var timestamp = logoutEvent.Timestamp.AsUtc();
         var active = await repository.GetActiveByCompoundId(
             logoutEvent.TenantId, logoutEvent.Username, logoutEvent.Ip, cancellationToken);
 
@@ -163,37 +164,37 @@ public class SessionService(ISessionRepository repository, ISessionEventReposito
 
         if (query.LoginAt is { Since: { } loginSince })
         {
-            var since = AsUtc(loginSince);
+            var since = loginSince.AsUtc();
             sessions = sessions.Where(s => s.LoginAt >= since);
         }
 
         if (query.LoginAt is { Until: { } loginUntil })
         {
-            var until = AsUtc(loginUntil);
+            var until = loginUntil.AsUtc();
             sessions = sessions.Where(s => s.LoginAt <= until);
         }
 
         if (query.LogoutAt is { Since: { } logoutSince })
         {
-            var since = AsUtc(logoutSince);
+            var since = logoutSince.AsUtc();
             sessions = sessions.Where(s => s.LogoutAt != null && s.LogoutAt >= since);
         }
 
         if (query.LogoutAt is { Until: { } logoutUntil })
         {
-            var until = AsUtc(logoutUntil);
+            var until = logoutUntil.AsUtc();
             sessions = sessions.Where(s => s.LogoutAt != null && s.LogoutAt <= until);
         }
 
         if (query.LastSeenAt is { Since: { } updateSince })
         {
-            var since = AsUtc(updateSince);
+            var since = updateSince.AsUtc();
             sessions = sessions.Where(s => s.LastSeenAt >= since);
         }
 
         if (query.LastSeenAt is { Until: { } updateUntil })
         {
-            var until = AsUtc(updateUntil);
+            var until = updateUntil.AsUtc();
             sessions = sessions.Where(s => s.LastSeenAt <= until);
         }
 
@@ -215,15 +216,4 @@ public class SessionService(ISessionRepository repository, ISessionEventReposito
             session.LastSeenAt = timestamp;
         }
     }
-
-    /// <summary>
-    /// Normalizes an inbound timestamp to UTC so all stored values are directly comparable.
-    /// A value with no kind is assumed to already be UTC.
-    /// </summary>
-    private static DateTime AsUtc(DateTime value) => value.Kind switch
-    {
-        DateTimeKind.Utc => value,
-        DateTimeKind.Local => value.ToUniversalTime(),
-        _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
-    };
 }

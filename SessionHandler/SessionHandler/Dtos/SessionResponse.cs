@@ -1,4 +1,5 @@
 using SessionHandler.Models;
+using SessionHandler.Utils;
 
 namespace SessionHandler.Dtos;
 
@@ -19,11 +20,7 @@ public record SessionResponse(
         session.Username,
         session.Ip,
         session.Tags,
-        AsUtc(session.LoginAt),
-        AsUtc(session.LastSeenAt),
-        session.LogoutAt is { } logoutAt ? AsUtc(logoutAt) : null);
-
-    // SQLite round-trips DateTime as text without a kind; stamp it back to UTC so the
-    // serialized response carries a 'Z'.
-    private static DateTime AsUtc(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Utc);
+        session.LoginAt.AsUtc(),
+        session.LastSeenAt.AsUtc(),
+        session.LogoutAt?.AsUtc());
 }

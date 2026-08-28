@@ -22,8 +22,8 @@ public class SessionEventsController(ISessionEventService sessionEventsService) 
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<SessionEventResponse>> Get(int id, CancellationToken cancellationToken)
     {
-        var sessionEvent = await sessionEventsService.GetById(id, cancellationToken);
-        return Ok((SessionEventResponse)sessionEvent);
+        SessionEventResponse sessionEvent = await sessionEventsService.GetById(id, cancellationToken);
+        return Ok(sessionEvent);
     }
 
     [HttpPost("search")]

@@ -3,6 +3,7 @@ using SessionHandler.Dtos;
 using SessionHandler.Exceptions;
 using SessionHandler.Interfaces;
 using SessionHandler.Models;
+using SessionHandler.Utils;
 
 namespace SessionHandler.Services;
 
@@ -62,13 +63,13 @@ public class SessionEventService(ISessionEventRepository repository) : ISessionE
 
         if (query.Timestamp is { Since: { } since })
         {
-            var sinceUtc = AsUtc(since);
+            var sinceUtc = since.AsUtc();
             events = events.Where(e => e.Timestamp >= sinceUtc);
         }
 
         if (query.Timestamp is { Until: { } until })
         {
-            var untilUtc = AsUtc(until);
+            var untilUtc = until.AsUtc();
             events = events.Where(e => e.Timestamp <= untilUtc);
         }
 
@@ -76,15 +77,4 @@ public class SessionEventService(ISessionEventRepository repository) : ISessionE
             .OrderByDescending(e => e.Timestamp)
             .ToListAsync(cancellationToken);
     }
-
-    /// <summary>
-    /// Normalizes an inbound timestamp to UTC so it is directly comparable to stored
-    /// values. A value with no kind is assumed to already be UTC.
-    /// </summary>
-    private static DateTime AsUtc(DateTime value) => value.Kind switch
-    {
-        DateTimeKind.Utc => value,
-        DateTimeKind.Local => value.ToUniversalTime(),
-        _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
-    };
 }

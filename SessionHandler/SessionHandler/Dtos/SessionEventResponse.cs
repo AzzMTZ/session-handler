@@ -1,4 +1,5 @@
 using SessionHandler.Models;
+using SessionHandler.Utils;
 
 namespace SessionHandler.Dtos;
 
@@ -20,10 +21,6 @@ public record SessionEventResponse(
         sessionEvent.Username,
         sessionEvent.Ip,
         sessionEvent.Tags,
-        AsUtc(sessionEvent.Timestamp),
+        sessionEvent.Timestamp.AsUtc(),
         sessionEvent.Type);
-
-    // SQLite round-trips DateTime as text without a kind; stamp it back to UTC so the
-    // serialized response carries a 'Z'.
-    private static DateTime AsUtc(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Utc);
 }
