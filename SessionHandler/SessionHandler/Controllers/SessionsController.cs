@@ -8,6 +8,7 @@ namespace SessionHandler.Controllers;
 /// Ingestion and query surface for sessions.
 /// <list type="bullet">
 ///   <item><c>POST /sessions</c> — apply a Login event</item>
+///   <item><c>GET /sessions/{tenantId}/{username}/{ip}</c> — fetch the active session for an identity</item>
 ///   <item><c>PUT /sessions/{tenantId}/{username}/{ip}</c> — apply an Update event</item>
 ///   <item><c>DELETE /sessions/{tenantId}/{username}/{ip}</c> — apply a Logout event</item>
 ///   <item><c>POST /sessions/search</c> — query active and historical sessions</item>
@@ -22,7 +23,23 @@ public class SessionsController(ISessionService sessionsService) : ControllerBas
         CancellationToken cancellationToken)
     {
         SessionResponse createdSession = await sessionsService.Login(loginEvent, cancellationToken);
-        return CreatedAtAction(nameof(Login), createdSession);
+        return CreatedAtAction(
+            nameof(Get),
+            new
+            {
+                tenantId = createdSession.TenantId,
+                username = createdSession.Username,
+                ip = createdSession.Ip,
+            },
+            createdSession);
+    }
+
+    [HttpGet("{tenantId}/{username}/{ip}")]
+    public async Task<ActionResult<SessionResponse>> Get(
+        string tenantId, string username, string ip, CancellationToken cancellationToken)
+    {
+        SessionResponse session = await sessionsService.Get(tenantId, username, ip, cancellationToken);
+        return Ok(session);
     }
 
     [HttpPut("{tenantId}/{username}/{ip}")]
