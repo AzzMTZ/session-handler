@@ -19,6 +19,8 @@ namespace SessionHandler.Controllers;
 public class SessionsController(ISessionService sessionsService) : ControllerBase
 {
     [HttpPost]
+    [ProducesResponseType<SessionResponse>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<SessionResponse>> Login([FromBody] LoginEvent loginEvent,
         CancellationToken cancellationToken)
     {
@@ -35,6 +37,8 @@ public class SessionsController(ISessionService sessionsService) : ControllerBas
     }
 
     [HttpGet("{tenantId}/{username}/{ip}")]
+    [ProducesResponseType<SessionResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<SessionResponse>> Get(
         string tenantId, string username, string ip, CancellationToken cancellationToken)
     {
@@ -43,6 +47,8 @@ public class SessionsController(ISessionService sessionsService) : ControllerBas
     }
 
     [HttpPut("{tenantId}/{username}/{ip}")]
+    [ProducesResponseType<SessionResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<SessionResponse>> Update(
         string tenantId, string username, string ip,
         [FromBody] UpdateSessionRequest request, CancellationToken cancellationToken)
@@ -54,6 +60,7 @@ public class SessionsController(ISessionService sessionsService) : ControllerBas
 
     [HttpDelete("{tenantId}/{username}/{ip}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Logout(
         string tenantId, string username, string ip,
         [FromBody] LogoutSessionRequest request, CancellationToken cancellationToken)
@@ -64,7 +71,7 @@ public class SessionsController(ISessionService sessionsService) : ControllerBas
     }
 
     [HttpPost("search")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType<List<SessionResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<SessionResponse>>> Search(
         [FromBody] SessionQuery query, CancellationToken cancellationToken)
     {
