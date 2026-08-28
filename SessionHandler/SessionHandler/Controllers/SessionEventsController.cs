@@ -28,6 +28,7 @@ public class SessionEventsController(ISessionEventService sessionEventsService) 
 
     [HttpPost("search")]
     [ProducesResponseType<List<SessionEventResponse>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<List<SessionEventResponse>>> Search(
         [FromBody] SessionEventQuery query, CancellationToken cancellationToken)
     {
