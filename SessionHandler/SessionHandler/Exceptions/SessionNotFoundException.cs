@@ -14,9 +14,18 @@ public class SessionNotFoundException : Exception
         Ip = ip;
     }
 
-    public string TenantId { get; }
+    /// <summary>Thrown when a lookup by surrogate id matches no session, active or historical.</summary>
+    public SessionNotFoundException(int id)
+        : base($"No session found with id '{id}'.")
+    {
+        Id = id;
+    }
 
-    public string Username { get; }
+    public string? TenantId { get; }
 
-    public string Ip { get; }
+    public string? Username { get; }
+
+    public string? Ip { get; }
+
+    public int? Id { get; }
 }

@@ -27,6 +27,9 @@ public class SessionRepository(SessionDbContext db) : ISessionRepository
             .OrderByDescending(s => s.LoginAt)
             .FirstOrDefaultAsync(cancellationToken);
 
+    public Task<Session?> GetById(int id, CancellationToken cancellationToken = default) =>
+        db.Sessions.AsNoTracking().FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
+
     public IQueryable<Session> Query() => db.Sessions.AsNoTracking();
 
     public Task<int> SaveChanges(CancellationToken cancellationToken = default) =>

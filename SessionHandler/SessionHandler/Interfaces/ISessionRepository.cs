@@ -25,6 +25,11 @@ public interface ISessionRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Loads a session by its surrogate id, active or historical, or <c>null</c> if none exists.
+    /// </summary>
+    Task<Session?> GetById(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// A no-tracking <see cref="IQueryable{T}"/> over all sessions (active and historical)
     /// for arbitrary read queries.
     /// </summary>

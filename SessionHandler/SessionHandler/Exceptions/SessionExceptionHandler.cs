@@ -18,6 +18,7 @@ public class SessionExceptionHandler(IProblemDetailsService problemDetailsServic
         var statusCode = exception switch
         {
             SessionNotFoundException => StatusCodes.Status404NotFound,
+            SessionEventNotFoundException => StatusCodes.Status404NotFound,
             SessionAlreadyExistsException => StatusCodes.Status409Conflict,
             _ => (int?)null,
         };

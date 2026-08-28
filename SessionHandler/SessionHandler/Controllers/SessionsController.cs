@@ -8,7 +8,7 @@ namespace SessionHandler.Controllers;
 /// Ingestion and query surface for sessions.
 /// <list type="bullet">
 ///   <item><c>POST /sessions</c> — apply a Login event</item>
-///   <item><c>GET /sessions/{tenantId}/{username}/{ip}</c> — fetch the active session for an identity</item>
+///   <item><c>GET /sessions/{id}</c> — fetch a session (active or historical) by its surrogate id</item>
 ///   <item><c>PUT /sessions/{tenantId}/{username}/{ip}</c> — apply an Update event</item>
 ///   <item><c>DELETE /sessions/{tenantId}/{username}/{ip}</c> — apply a Logout event</item>
 ///   <item><c>POST /sessions/search</c> — query active and historical sessions</item>
@@ -26,23 +26,26 @@ public class SessionsController(ISessionService sessionsService) : ControllerBas
     {
         SessionResponse createdSession = await sessionsService.Login(loginEvent, cancellationToken);
         return CreatedAtAction(
-            nameof(Get),
+            nameof(GetById),
             new
             {
-                tenantId = createdSession.TenantId,
-                username = createdSession.Username,
-                ip = createdSession.Ip,
+                id = createdSession.Id
             },
             createdSession);
     }
 
-    [HttpGet("{tenantId}/{username}/{ip}")]
+    /// <summary>
+    /// Looks up a session by its surrogate id (as returned in <see cref="SessionResponse.Id"/>),
+    /// active or historical. There is no lookup by the identity triple alone — Update and
+    /// Logout still address a session that way since it is always the active one, but a GET
+    /// has no such guarantee, so the id is the only unambiguous key for a single-session fetch.
+    /// </summary>
+    [HttpGet("{id:int}")]
     [ProducesResponseType<SessionResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<SessionResponse>> Get(
-        string tenantId, string username, string ip, CancellationToken cancellationToken)
+    public async Task<ActionResult<SessionResponse>> GetById(int id, CancellationToken cancellationToken)
     {
-        SessionResponse session = await sessionsService.Get(tenantId, username, ip, cancellationToken);
+        SessionResponse session = await sessionsService.GetById(id, cancellationToken);
         return Ok(session);
     }
 
