@@ -7,8 +7,6 @@ using SessionHandler.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -34,7 +32,6 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
 }
 
-// Configure the HTTP request pipeline.
 app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())

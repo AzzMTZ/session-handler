@@ -2,7 +2,7 @@ using SessionHandler.Models;
 
 namespace SessionHandler.Dtos;
 
-/// <summary>Read model returned by the query endpoint.</summary>
+/// <summary>Read model returned by the session endpoints.</summary>
 public record SessionResponse(
     string TenantId,
     string Username,

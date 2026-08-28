@@ -9,10 +9,22 @@ namespace SessionHandler.Interfaces;
 /// </summary>
 public interface ISessionService
 {
+    /// <summary>
+    /// Opens a session for the identity triple, or throws
+    /// <see cref="Exceptions.SessionAlreadyExistsException"/> if one is already active.
+    /// </summary>
     Task<Session> Login(LoginEvent loginEvent, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Applies an Update event to the active session, or throws
+    /// <see cref="Exceptions.SessionNotFoundException"/> if none is open.
+    /// </summary>
     Task<Session> Update(UpdateEvent updateEvent, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Ends the active session, or throws
+    /// <see cref="Exceptions.SessionNotFoundException"/> if none is open.
+    /// </summary>
     Task Logout(LogoutEvent loginEvent, CancellationToken cancellationToken = default);
 
     /// <summary>
