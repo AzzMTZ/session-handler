@@ -21,9 +21,16 @@ namespace SessionHandler.Migrations
             // SessionRepository.GetActiveByCompoundId already uses, and closes the
             // losing duplicates as of their own LoginAt, since they represent invalid
             // state that should never have persisted as active in the first place.
+            //
+            // The losing rows are computed once into a temp table so the SessionEvents
+            // insert and the Sessions update act on the exact same snapshot - a Logout
+            // event is recorded for each one it closes (Type 2 = Logout, matching
+            // SessionEventType), so the audit trail stays consistent with the session's
+            // resulting state instead of a LogoutAt with no event explaining it.
             migrationBuilder.Sql("""
-                UPDATE Sessions
-                SET LogoutAt = LoginAt
+                CREATE TEMP TABLE _DuplicateActiveSessions AS
+                SELECT Id, TenantId, Username, Ip, LoginAt
+                FROM Sessions
                 WHERE LogoutAt IS NULL
                   AND Id NOT IN (
                       SELECT Id FROM (
@@ -38,6 +45,20 @@ namespace SessionHandler.Migrations
                       WHERE rn = 1
                   );
                 """);
+
+            migrationBuilder.Sql("""
+                INSERT INTO SessionEvents (SessionId, TenantId, Username, Ip, Tags, Timestamp, Type)
+                SELECT Id, TenantId, Username, Ip, NULL, LoginAt, 2
+                FROM _DuplicateActiveSessions;
+                """);
+
+            migrationBuilder.Sql("""
+                UPDATE Sessions
+                SET LogoutAt = LoginAt
+                WHERE Id IN (SELECT Id FROM _DuplicateActiveSessions);
+                """);
+
+            migrationBuilder.Sql("DROP TABLE _DuplicateActiveSessions;");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Sessions_ActiveIdentity",
