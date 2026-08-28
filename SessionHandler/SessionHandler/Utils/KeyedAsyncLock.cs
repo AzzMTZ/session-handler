@@ -1,5 +1,3 @@
-using System.Collections.Concurrent;
-
 namespace SessionHandler.Utils;
 
 /// <summary>
@@ -9,21 +7,39 @@ namespace SessionHandler.Utils;
 /// the same lock) without blocking operations on unrelated keys. Entries are removed
 /// once uncontended so the backing dictionary doesn't grow unbounded across the
 /// lifetime of the process.
+///
+/// The dictionary lookup and the ref-count increment/decrement are guarded by one
+/// plain lock (<see cref="_gate"/>) rather than a lock-free <c>ConcurrentDictionary</c>
+/// with <c>Interlocked</c> counters: those are two different atomicity mechanisms that
+/// don't coordinate with each other, which is exactly what let a ref count reach zero
+/// and get removed from the dictionary in the same instant a new caller had just
+/// incremented it back to one — silently splitting one logical lock into two. A single
+/// lock around the whole "check refcount, decide" sequence on both the acquire and
+/// release side closes that gap entirely. It's only ever held for O(1) dictionary
+/// bookkeeping, never across the actual <c>await Semaphore.WaitAsync</c>, so unrelated
+/// keys still never block on each other for any meaningful duration.
 /// </summary>
 public class KeyedAsyncLock<TKey> where TKey : notnull
 {
-    private readonly ConcurrentDictionary<TKey, Entry> _entries = new();
+    private readonly Dictionary<TKey, Entry> _entries = new();
+    private readonly object _gate = new();
 
     public async Task<IDisposable> LockAsync(TKey key, CancellationToken cancellationToken = default)
     {
-        var entry = _entries.AddOrUpdate(
-            key,
-            _ => new Entry(),
-            (_, existing) =>
+        Entry entry;
+        lock (_gate)
+        {
+            if (_entries.TryGetValue(key, out var existing))
             {
-                Interlocked.Increment(ref existing.RefCount);
-                return existing;
-            });
+                existing.RefCount++;
+                entry = existing;
+            }
+            else
+            {
+                entry = new Entry();
+                _entries[key] = entry;
+            }
+        }
 
         await entry.Semaphore.WaitAsync(cancellationToken);
         return new Releaser(this, key, entry);
@@ -33,15 +49,13 @@ public class KeyedAsyncLock<TKey> where TKey : notnull
     {
         entry.Semaphore.Release();
 
-        // Interlocked.Decrement both mutates and returns the post-decrement value
-        // atomically, so this check-then-remove can't race with the increment above
-        // (which happens on a different code path, not covered by any shared lock).
-        if (Interlocked.Decrement(ref entry.RefCount) == 0)
+        lock (_gate)
         {
-            // Only removes if the dictionary still holds this exact instance, so a
-            // concurrent LockAsync that already re-added this key isn't dropped.
-            ((ICollection<KeyValuePair<TKey, Entry>>)_entries)
-                .Remove(new KeyValuePair<TKey, Entry>(key, entry));
+            entry.RefCount--;
+            if (entry.RefCount == 0)
+            {
+                _entries.Remove(key);
+            }
         }
     }
 
