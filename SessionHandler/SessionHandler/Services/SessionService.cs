@@ -114,19 +114,6 @@ public class SessionService(ISessionRepository repository, ISessionEventReposito
         await repository.SaveChanges(cancellationToken);
     }
 
-    public async Task<Session> Get(
-        string tenantId, string username, string ip, CancellationToken cancellationToken = default)
-    {
-        var active = await repository.GetActiveByCompoundId(tenantId, username, ip, cancellationToken);
-
-        if (active is null)
-        {
-            throw new SessionNotFoundException(tenantId, username, ip);
-        }
-
-        return active;
-    }
-
     public async Task<Session> GetById(int id, CancellationToken cancellationToken = default)
     {
         var session = await repository.GetById(id, cancellationToken);
