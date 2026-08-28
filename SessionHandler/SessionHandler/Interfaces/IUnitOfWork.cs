@@ -1,12 +1,10 @@
 namespace SessionHandler.Interfaces;
 
 /// <summary>
-/// Commits changes staged across repositories that share the same persistence
-/// context. <see cref="ISessionRepository"/> and <see cref="ISessionEventRepository"/>
-/// each stage inserts/mutations on the shared <c>SessionDbContext</c> but no longer
-/// expose their own <c>SaveChanges</c> — a session and its event must always commit
-/// together as one transaction, so there is exactly one commit point for both,
-/// injected into the service that orchestrates them.
+/// The single commit point for changes staged across <see cref="ISessionRepository"/>
+/// and <see cref="ISessionEventRepository"/> on the shared <c>SessionDbContext</c>:
+/// neither exposes its own <c>SaveChanges</c>, so a session and its event always
+/// commit as one transaction.
 /// </summary>
 public interface IUnitOfWork
 {

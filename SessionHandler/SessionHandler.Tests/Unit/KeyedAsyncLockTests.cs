@@ -6,9 +6,8 @@ namespace SessionHandler.Tests.Unit;
 
 /// <summary>
 /// <see cref="KeyedAsyncLock{TKey}"/> in isolation: per-key mutual exclusion, no
-/// cross-key blocking, and the entry bookkeeping that the concurrency-safety fixes
-/// were about — a cancelled waiter must give its claim back without releasing the
-/// lock, and uncontended keys must not linger in the backing dictionary.
+/// cross-key blocking, and entry bookkeeping — a cancelled waiter gives its claim
+/// back without releasing the lock, and uncontended keys don't linger in the dictionary.
 /// </summary>
 public class KeyedAsyncLockTests
 {

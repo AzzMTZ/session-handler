@@ -28,20 +28,16 @@ public class SessionDbContext : DbContext
             session.Property(s => s.Username).IsRequired();
             session.Property(s => s.Ip).IsRequired();
 
-            // Backs the common "sessions for this identity / this IP" lookups, active and
-            // historical alike — kept as its own index (explicit name, distinct from the
-            // filtered one below) since a partial index can't serve a query that isn't
-            // provably restricted to its filter.
+            // Backs identity/IP lookups over all sessions; separate from the filtered
+            // index below, which can't serve queries not restricted to its filter.
             session.HasIndex(s => new { s.TenantId, s.Username, s.Ip }, "IX_Sessions_TenantId_Username_Ip");
 
             // Backs "active sessions only" filtering used by most queries.
             session.HasIndex(s => s.LogoutAt);
 
             // Database-enforced backstop for "at most one active session per identity
-            // triple": SessionService.Login already serializes concurrent Logins for the
-            // same triple via KeyedAsyncLock, so this should never actually be hit in
-            // normal operation — it exists so the invariant holds even if some future
-            // code path writes a Session without going through that lock.
+            // triple". SessionService.Login's lock normally prevents the collision; this
+            // holds the invariant even for a write that bypasses that lock.
             session.HasIndex(s => new { s.TenantId, s.Username, s.Ip }, "IX_Sessions_ActiveIdentity")
                 .IsUnique()
                 .HasFilter("\"LogoutAt\" IS NULL");

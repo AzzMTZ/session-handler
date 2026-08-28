@@ -36,10 +36,9 @@ public class SessionsController(ISessionService sessionsService) : ControllerBas
     }
 
     /// <summary>
-    /// Looks up a session by its surrogate id (as returned in <see cref="SessionResponse.Id"/>),
-    /// active or historical. There is no lookup by the identity triple alone — Update and
-    /// Logout still address a session that way since it is always the active one, but a GET
-    /// has no such guarantee, so the id is the only unambiguous key for a single-session fetch.
+    /// Looks up a session by surrogate id, active or historical. Id rather than the
+    /// identity triple because the triple is unambiguous only for the active session,
+    /// which a GET isn't restricted to.
     /// </summary>
     [HttpGet("{id:int}")]
     [ProducesResponseType<SessionResponse>(StatusCodes.Status200OK)]

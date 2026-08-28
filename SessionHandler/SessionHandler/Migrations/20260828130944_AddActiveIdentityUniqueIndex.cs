@@ -10,23 +10,13 @@ namespace SessionHandler.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // Close out any duplicate active sessions for the same identity triple
-            // that may already exist on this database from before this fix - e.g.
-            // from the exact race this PR closes, or from earlier manual/dev testing.
-            // CREATE UNIQUE INDEX below fails outright if any such duplicates remain,
-            // since SQLite can't build a unique index over data that already violates
-            // it - and Program.cs runs Database.Migrate() on startup, so that failure
-            // would surface as the app refusing to start, not just a bad migration.
-            // Keeps the same "most recently opened session wins" tie-break that
-            // SessionRepository.GetActiveByCompoundId already uses, and closes the
-            // losing duplicates as of their own LoginAt, since they represent invalid
-            // state that should never have persisted as active in the first place.
-            //
-            // The losing rows are computed once into a temp table so the SessionEvents
-            // insert and the Sessions update act on the exact same snapshot - a Logout
-            // event is recorded for each one it closes (Type 2 = Logout, matching
-            // SessionEventType), so the audit trail stays consistent with the session's
-            // resulting state instead of a LogoutAt with no event explaining it.
+            // The unique index below can't be built while duplicate active sessions
+            // exist, and Database.Migrate() runs on startup, so pre-existing duplicates
+            // would block the app from booting. Close the losers here, keeping the
+            // "most recently opened wins" tie-break from GetActiveByCompoundId and
+            // setting LogoutAt = LoginAt. Losers go into a temp table first so the
+            // event insert and the session update see one snapshot; each closed session
+            // also gets a Logout event (Type 2) so the audit trail stays consistent.
             migrationBuilder.Sql("""
                 CREATE TEMP TABLE _DuplicateActiveSessions AS
                 SELECT Id, TenantId, Username, Ip, LoginAt
