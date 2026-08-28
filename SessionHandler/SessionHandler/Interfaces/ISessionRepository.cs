@@ -4,9 +4,10 @@ namespace SessionHandler.Interfaces;
 
 /// <summary>
 /// Data access layer for <see cref="Session"/> rows. Write methods stage changes on
-/// the underlying context; call <see cref="SaveChanges"/> once per unit of work
-/// to flush them. <see cref="Query"/> exposes a composable read surface so consumers
-/// can filter on any attribute (or combination, including time).
+/// the underlying context; commit them via <see cref="IUnitOfWork"/>, injected
+/// separately into whatever service orchestrates the write. <see cref="Query"/>
+/// exposes a composable read surface so consumers can filter on any attribute
+/// (or combination, including time).
 /// </summary>
 public interface ISessionRepository
 {
@@ -34,7 +35,4 @@ public interface ISessionRepository
     /// for arbitrary read queries.
     /// </summary>
     IQueryable<Session> Query();
-
-    /// <summary>Flushes staged changes to the database and returns the affected row count.</summary>
-    Task<int> SaveChanges(CancellationToken cancellationToken = default);
 }

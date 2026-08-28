@@ -18,7 +18,4 @@ public class SessionEventRepository(SessionDbContext db) : ISessionEventReposito
         db.SessionEvents.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
 
     public IQueryable<SessionEvent> Query() => db.SessionEvents.AsNoTracking();
-
-    public Task<int> SaveChanges(CancellationToken cancellationToken = default) =>
-        db.SaveChangesAsync(cancellationToken);
 }
